@@ -13,6 +13,39 @@ def logging_function():
     logger.warning('Warning raised by logger')
 
 
+def set_logger(logger):
+    """set properties of a logger creating a new one if doesn't exist.
+    If existing, must have no handlers or two handlers file and console.
+    
+    2026/01/10 moved here from G:\My Drive\progetti\POOL\coating_opt\fortran\EA\EA.py
+    looks different from start_logger, which replaced it in EA.py code."""
+    
+    '''
+    logging setup, remember the sequence below:
+    DEBUG, INFO, WARNING, ERROR, CRITICAL
+    '''
+    
+     # add the handlers to logger, the condition is useful if you launch repeatly the script from interpreter (avoid multiple messages)
+    ##2018/01/16 still doesn't work if there are file errors and only one handler is
+    ## created (console, not file), it files when it tries to close two handlers.   
+    logger.setLevel(logging.DEBUG)
+    # create file and console handlers which log even debug messages
+    if len(logging.root.handlers) == 0:
+        # create console handler with a higher log level
+        fh = logging.FileHandler(logfile)        #logging.basicConfig(format='%(asctime)s %(name)-12s  
+        logger.addHandler(fh)       
+        ch = logging.StreamHandler()
+        logger.addHandler(ch)
+        logger.info("\n%"+15*"--"+"\nlogging started on "+logfile)
+    else:
+        fh,ch=logging.root.handlers
+    fh.setLevel(logging.DEBUG)
+    ch.setLevel(logging.INFO)
+    # create formatter and add it to the handlers
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    fh.setFormatter(formatter)
+    return logger   
 
 
 def start_logger(logger = None,cfgfile=None):
