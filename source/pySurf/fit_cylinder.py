@@ -158,7 +158,7 @@ def cone_error3(odr=(0,220.,0,0),points=None,coeff=None,retall=False,extra=False
     if retall: return fom,residuals,coeff
     else: return fom  #,deltaR,radius
 	
-def subtract_cylinder(pp,odr,sampleName=''):
+def subtract_cylinder(pp,odr,sampleName='',verbose=True):
 #not used in v1
     """
     odr: 6-vector (origin_y,origin_y,origin_z,direction_x,direction_y,direction_z),
@@ -183,28 +183,32 @@ def subtract_cylinder(pp,odr,sampleName=''):
     save_points(np.hstack([pp[:,0:2],deltaR[:,None]*1000]),fn_add_subfix(datafile,'_cylinder'))    
     
     #cylinder output
-    print ('Best fit radius %s'%radius)
+
     misal=np.arccos(1/np.sqrt(1+((odr[2:]**2).sum())))
-    print ('Misalignment of optical axis: %s rad (%s deg)'%(misal,misal*np.pi/180))
     
-    #rms output
-    print ('rms entire surface %s'%(np.nanstd(rp)))
-    plt.figure()
-    plt.plot(np.nanstd(rp))
-    plt.plot(np.nanstd(rp,axis=0))
-    plt.plot(np.nanstd(rp,axis=1))
+    if verbose:
+        print ('Best fit radius %s'%radius)    
+        print ('Misalignment of optical axis: %s rad (%s deg)'%(misal,misal*np.pi/180))
+        
+        #rms output
+        print ('rms entire surface %s'%(np.nanstd(rp)))
+        plt.figure()
+        plt.plot(np.nanstd(rp))
+        plt.plot(np.nanstd(rp,axis=0))
+        plt.plot(np.nanstd(rp,axis=1))
 
     #mask outliers on a copy
     rp2=rp[:]
     np.where(np.isnan(rp2))
 
-def subtract_cone(pp,odr,sampleName='',outfile=None,vmin=None,vmax=None):
+def subtract_cone(pp,odr,sampleName='',outfile=None,vmin=None,vmax=None,verbose=True):
 #not used in v1
     """
     odr: 6-vector (origin_y,origin_y,origin_z,direction_x,direction_y,direction_z),
         note that  this is redundant, since only two components are enough for direction 
         (magnitude is irrelevant).
     pp: complete set of points Npx3
+    verbos: if set print output and generate plot
     """
     fom,deltaR,coeff=cone_error(odr,pp,retall=True)
     xymin=np.nanmin(pp,axis=0)[0:2]
@@ -225,17 +229,19 @@ def subtract_cone(pp,odr,sampleName='',outfile=None,vmin=None,vmax=None):
     
     #cone output
     m=coeff[0]
-    print ('Cone angle:%s+/-%s rad(%s+/-%s deg) '%(np.arctan(m),0,np.arctan(m)*180/np.pi,0))
-    print ('Axis intercept at x=0: %smm '%(coeff[1]))
-    misal=(np.arccos(1/np.sqrt(1+((odr[2:]**2).sum()))))
-    print ('Misalignment of optical axis: %s rad (%s deg)'%(misal,misal*180./pi))
-    
-    #rms output
-    print ('rms entire surface %s'%(np.nanstd))
-    plt.figure()
-    plt.plot(np.nanstd(rp))
-    plt.plot(np.nanstd(rp,axis=0))
-    plt.plot(np.nanstd(rp,axis=1))
+    if verbose:
+        print ('Cone angle:%s+/-%s rad(%s+/-%s deg) '%(np.arctan(m),0,np.arctan(m)*180/np.pi,0))
+        print ('Axis intercept at x=0: %smm '%(coeff[1]))
+        misal=(np.arccos(1/np.sqrt(1+((odr[2:]**2).sum()))))
+        print ('Misalignment of optical axis: %s rad (%s deg)'%(misal,misal*180./pi))
+        
+        #rms output
+        print ('rms entire surface %s'%(np.nanstd))
+        
+        plt.figure()
+        plt.plot(np.nanstd(rp))
+        plt.plot(np.nanstd(rp,axis=0))
+        plt.plot(np.nanstd(rp,axis=1))
 
     #mask outliers on a copy
     rp2=rp[:]
@@ -264,7 +270,7 @@ def fit_cone(points,guessValue=None):
     angle=np.arccos()
 """
 
-def fit_cone(pts,odr2,zscale=1.,keepnan=False,**kwargs):
+def fit_cone(pts,odr2,zscale=1.,keepnan=False,verbose=True,**kwargs):
     """   fit pts and return residuals. Info are printed. odr2 is starting guess.
     
     fom,deltaR,pars=fit_cone(pts,odr2,fom_func)
@@ -325,32 +331,33 @@ def fit_cone(pts,odr2,zscale=1.,keepnan=False,**kwargs):
     direction=np.array((odr[2],np.sqrt(1-odr[2]**2-odr[3]**2),odr[3])) # director cosines, cy is assumed positive
     direction=direction/np.sqrt((direction**2).sum())  
     
-    print ('-----------------------------------')
-    print ('Results of fit with function: "%s" on region:'%fom_func)
-    print ('X: [%6.3f,%6.3f]'%tuple(s[0]))
-    print ('Y: [%6.3f,%6.3f]'%tuple(s[1]))
-    print ('data range: [%6.3f,%6.3f]'%tuple(s[2]))
-    print ('---')
-    if mi:
-        print (result )   
+    if verbose:
+        print ('-----------------------------------')
+        print ('Results of fit with function: "%s" on region:'%fom_func)
+        print ('X: [%6.3f,%6.3f]'%tuple(s[0]))
+        print ('Y: [%6.3f,%6.3f]'%tuple(s[1]))
+        print ('data range: [%6.3f,%6.3f]'%tuple(s[2]))
+        print ('---')
+        if mi:
+            print (result )   
     
-    print ('-----------------------------------')
-    print ('Axis direction, components (director cosines): ')
-    print (direction)
-    print ('Angle of cone axis with x,y,z axis (deg):')
-    print (np.arccos(np.abs(direction))*180/np.pi)
-    print ('Axis intercept with y=0: ')
-    print (origin)
-    print ('Cone parameters (angle(deg), R@y=0) [A,B for R=A]:')
-    print (np.arctan(coeff[0])*180/np.pi,coeff[1])
-    print ('---')
-    print ('rms residuals=%s [units of Z]'%(fom*zscale))
-    #coordinates of cone apex
+        print ('-----------------------------------')
+        print ('Axis direction, components (director cosines): ')
+        print (direction)
+        print ('Angle of cone axis with x,y,z axis (deg):')
+        print (np.arccos(np.abs(direction))*180/np.pi)
+        print ('Axis intercept with y=0: ')
+        print (origin)
+        print ('Cone parameters (angle(deg), R@y=0) [A,B for R=A]:')
+        print (np.arctan(coeff[0])*180/np.pi,coeff[1])
+        print ('---')
+        print ('rms residuals=%s [units of Z]'%(fom*zscale))
+        #coordinates of cone apex
 
     return deltaR,odr        
     
         
-def fit_cylinder(pts,odr2,zscale=1.,keepnan=False,align=False,**kwargs):  
+def fit_cylinder(pts,odr2,zscale=1.,keepnan=False,align=False,verbose=True,**kwargs):  
     """   fit pts and return residuals. Info are printed. 
     odr2: starting guess for fom func parameters. 
         for cylinder_error3, it is (origin_y,origin_z,direction_x,direction_z),
@@ -402,27 +409,30 @@ def fit_cylinder(pts,odr2,zscale=1.,keepnan=False,align=False,**kwargs):
         deltaR=pts
     
     #fom_func, s, zscale, odr, fom, coeff
-    
-    print ('-----------------------------------')
-    print ('Results of fit with function: "%s" on region:'%fom_func)
-    print ('X: [%6.3f,%6.3f]'%tuple(s[0]))
-    print ('Y: [%6.3f,%6.3f]'%tuple(s[1]))
-    print ('data range: [%6.3f,%6.3f]'%tuple(s[2]))
-    print ("---")
-    if mi:
-        print (result )      
-    print ('(Angle of cyl axis with y axis (deg):')
     vy=np.sqrt(1-(odr[-2:]**2).sum())
-    print (np.arccos(vy)*180/np.pi)
-    print ('Rotation about z axis from y axis(deg):')
     az=np.arctan2(odr[2],vy)
-    print (az*180/np.pi)
-    print ('Radius:')
-    print (coeff)
-    print ('Axis Parameters:')
-    print (odr)
-    print ('---')
-    print ('rms residuals=%s um'%(fom*zscale))
+    
+    if verbose:
+        print ('-----------------------------------')
+        print ('Results of fit with function: "%s" on region:'%fom_func)
+        print ('X: [%6.3f,%6.3f]'%tuple(s[0]))
+        print ('Y: [%6.3f,%6.3f]'%tuple(s[1]))
+        print ('data range: [%6.3f,%6.3f]'%tuple(s[2]))
+        print ("---")
+        if mi:
+            print (result )      
+        print ('(Angle of cyl axis with y axis (deg):')
+    
+        print (np.arccos(vy)*180/np.pi)
+        print ('Rotation about z axis from y axis(deg):')
+        print (az*180/np.pi)
+        print ('Radius:')
+        print (coeff)
+        print ('Axis Parameters:')
+        print (odr)
+        print ('---')
+        print ('rms residuals=%s um'%(fom*zscale))
+    
     if align:
         c=span(deltaR,axis=0)[:2].sum(axis=1)/2 #center of all points
         deltaR=rotate_points(deltaR,az,center=c)
