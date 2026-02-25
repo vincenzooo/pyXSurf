@@ -91,32 +91,8 @@ def cylinder_error3(odr:float=(0,0,0,0),points:float=None,radius:float=None,reta
     if retall: return fom,residuals,radius
     else: return fom  #,deltaR,radius
 
-def cone_error(odr=(0,0,0,0,0,0),points=None,retall=False,extra=False):  #origin=(0,0,0),direction=(0,1.,0),radius is calculated from best fit
-    """Given a set of N points in format Nx3, returns the rms surface error on the cone defined by origin (intercept of the axis with x=0) and direction, 
-    passed as 4-vector odr(origin_y,origin_z,direction_x,direction_z). 
-    Best fit cone for odr is calculated from linear fit of data. 
-    If retall is set, additional values are returned :
-    coeff: best fit radius for the cone as [m,q] for x' distance from x=0 plan on cone axis R(x')=m x' + q. Half cone angle is atan(m). 
-    deltaR[N,3]: deviation from radius for each point.
-    extra is equivalent to retall, renamed 2018/02/15 kept for backward compatibility
-    """
-    #ca 400 ms per loop
-    origin=odr[0:3]
-    direction=odr[3:]
-    vd=direction/np.sqrt((1+np.array(direction)**2).sum())  #normalize vector, not sure it is necessary.
-    x,y,z=np.hsplit(points,3)
-    Paxis=closest_point_on_line(points,direction,origin)
-    Paxdist=np.sqrt(((Paxis-origin)**2).sum(axis=1)) #distance of each point from
-    R=np.sqrt(((points-Paxis)**2).sum(axis=1)) #distance of each point from axis
-    coeff=np.polyfit(Paxdist,R,1) #best fit cone
-    deltaR=R-coeff[0]*Paxdist-coeff[1] #residuals
-    fom=np.sqrt(((deltaR)**2).sum()/len(deltaR))
-    residuals=np.hstack([x,y,deltaR[:,None]])
-    retall=retall | extra
-    if retall: return fom,residuals,coeff
-    else: return fom  #,deltaR,radius
-
-def cone_error3(odr=(0,220.,0,0),points=None,coeff=None,retall=False,extra=False):
+def cone_error(odr=(0,220.,0,0),points=None,coeff=None,retall=False,extra=False):
+#2026/02/25 removed unused functions `subtract_cone` etc., renamed to `cone_error` from `cone_error3`
 #2015/09/05 added functions for nan from np
 #2015/01/13 changed sign of deltaR to set bump-positive (it was opposite)
 #from v1
@@ -157,172 +133,84 @@ def cone_error3(odr=(0,220.,0,0),points=None,coeff=None,retall=False,extra=False
     retall=retall | extra
     if retall: return fom,residuals,coeff
     else: return fom  #,deltaR,radius
-	
-def subtract_cylinder(pp,odr,sampleName='',verbose=True):
-#not used in v1
-    """
-    odr: 6-vector (origin_y,origin_y,origin_z,direction_x,direction_y,direction_z),
-        note that  this is redundant, since only two components are enough for direction 
-        (magnitude is irrelevant).
-    pp: complete set of points Npx3
-    """
-    fom,deltaR,radius=cylinder_error(odr,pp,retall=False,extra=True)
-    xymin=np.nanmin(pp,axis=0)[0:2]
-    xymax=np.nanmax(pp,axis=0)[0:2]
-    rp=plot_points(np.hstack([pp[:,0:2],deltaR[:,None]*1000]),shape=(281,3001)) #this is done to easily replot and change scale
 
-    #surface map and data
-    plt.clf()
-    plt.imshow(rp,aspect='equal',interpolation='none',vmin=-5,vmax=10,
-        extent=[xymin[1],xymax[1],xymin[0],xymax[0]])
-    plt.colorbar()
-    plt.title(sampleName+(sampleName if sampleName else '')+'best-fit-cylinder removed.')
-    plt.xlabel('Y(mm)')
-    plt.ylabel('X(mm)')
-    plt.savefig(fn_add_subfix(datafile,'_cylinder','png'))
-    save_points(np.hstack([pp[:,0:2],deltaR[:,None]*1000]),fn_add_subfix(datafile,'_cylinder'))    
+def fit_cone(pts,
+             odr,
+             zscale=1.,
+             keepnan=False,
+             verbose=True,
+             **kwargs):
+    """   fit pts and return residuals. odr is starting guess. Print and plot if verbose is set.
     
-    #cylinder output
+        fom,deltaR,pars=fit_cone(pts,odr,fom_func)
+    
+    `odr` represent guess value for origin, direction, radius.
+ 
+     Parameters
+    ----------
+    pts
+        Input points (N, 3). Convention: columns are (x, y, z).
+    odr
+        Initial guess for origin, direction, radius, in format ``odr=(x,z,cx,cz)`` (see ``cone_error`` for details), in the same units as ``pts`` *after* scaling Z by ``1/zscale`` during fitting.
+        Format is 
+        typically:
+            odr=(span(xg).sum()/2.,220.,0,0.) #use nominal value for guess direction.
+    zscale
+        is the factor to multiply data to obtain same units as x and y, 
+    e.g. 1000. for x and y in mm and z in um. Output is in same unit as input
+    (pts and deltaR enter and exit with z in microns).
+    keepnan
+        Preserve NaNs in the Z column and return an array with the same shape as
+        input.
+    verbose
+        Print a compact report and generate a plot.
 
-    misal=np.arccos(1/np.sqrt(1+((odr[2:]**2).sum())))
-    
-    if verbose:
-        print ('Best fit radius %s'%radius)    
-        print ('Misalignment of optical axis: %s rad (%s deg)'%(misal,misal*np.pi/180))
+    kwargs
+        Passed to ``scipy.optimize.minimize``.
         
-        #rms output
-        print ('rms entire surface %s'%(np.nanstd(rp)))
-        plt.figure()
-        plt.plot(np.nanstd(rp))
-        plt.plot(np.nanstd(rp,axis=0))
-        plt.plot(np.nanstd(rp,axis=1))
-
-    #mask outliers on a copy
-    rp2=rp[:]
-    np.where(np.isnan(rp2))
-
-def subtract_cone(pp,odr,sampleName='',outfile=None,vmin=None,vmax=None,verbose=True):
-#not used in v1
-    """
-    odr: 6-vector (origin_y,origin_y,origin_z,direction_x,direction_y,direction_z),
-        note that  this is redundant, since only two components are enough for direction 
-        (magnitude is irrelevant).
-    pp: complete set of points Npx3
-    verbos: if set print output and generate plot
-    """
-    fom,deltaR,coeff=cone_error(odr,pp,retall=True)
-    xymin=np.nanmin(pp,axis=0)[0:2]
-    xymax=np.nanmax(pp,axis=0)[0:2]
-    rp=plot_points(np.hstack([pp[:,0:2],deltaR[:,None]*1000]),shape=(281,3001)) #this is done to easily replot and change scale
-
-    #surface map and data
-    plt.clf()
-    plt.imshow(rp,aspect='equal',interpolation='none',vmin=vmin,vmax=vmax,
-        extent=[xymin[1],xymax[1],xymin[0],xymax[0]])
-    plt.colorbar()
-    plt.title(((sampleName+' - ') if sampleName else (''))+'best-fit-cone removed.')
-    plt.xlabel('Y(mm)')
-    plt.ylabel('X(mm)')
-    if outfile:
-        plt.savefig(fn_add_subfix(outfile,'_cone','png'))
-        save_points(np.hstack([pp[:,0:2],deltaR[:,None]*1000]),fn_add_subfix(outfile,'_cone'))    
+        Parameters for optimization can be passed as keyword arguments in same way as for ``scipy.optimize.minimize`` (including passing ``solver`` name and ``options`` dictionary), e.g.:
     
-    #cone output
-    m=coeff[0]
-    if verbose:
-        print ('Cone angle:%s+/-%s rad(%s+/-%s deg) '%(np.arctan(m),0,np.arctan(m)*180/np.pi,0))
-        print ('Axis intercept at x=0: %smm '%(coeff[1]))
-        misal=(np.arccos(1/np.sqrt(1+((odr[2:]**2).sum()))))
-        print ('Misalignment of optical axis: %s rad (%s deg)'%(misal,misal*180./pi))
+        #evaluate fom without optimization fit_cone/fit_cylinder
+        deltaR,o = fit_cone(pts,odr,zscale=1000.,options={'maxiter':0})
+    
+        # fit from starting guess value odr0
+        deltaR,odr=fit_cylinder(c,odr0,zscale=1000.,options={'maxiter':500},
+        method='Nelder-Mead')  # default method is 'BFGS' or similar according to constraints.
         
-        #rms output
-        print ('rms entire surface %s'%(np.nanstd))
-        
-        plt.figure()
-        plt.plot(np.nanstd(rp))
-        plt.plot(np.nanstd(rp,axis=0))
-        plt.plot(np.nanstd(rp,axis=1))
+        ``options`` dictionary can include a ``maxiter`` key (common to all solvers). If maxiter is set to 0, the function is evaluated without optimization.
 
-    #mask outliers on a copy
-    rp2=rp[:]
-    np.where(np.isnan(rp2))   
-    return fom,deltaR,coeff
-
-"""   
-def fit_cylinder(points,guessValue=None,callback=None):
-#not used in v1
-    if guessValue!=None:
-        odr=guessValue
-    else:
-        odr=(0,220.,0,0)
-    result=minimize(cylinder_error,x0=(odr,),args=(points,),options={'maxiter':1000},callback=callback,method='Nelder-Mead')
-    d=result.x[[2,3]]
-    angle=np.arccos()
-
-def fit_cone(points,guessValue=None):
-#not used in v1
-    if guessValue!=None:
-        odr=guessValue
-    else:
-        odr=(0,220.,0,0)
-    result=minimize(cone_error,x0=(odr,),args=(points,),options={'maxiter':1000},callback=p,method='Nelder-Mead')
-    d=result.x[[2,3]]
-    angle=np.arccos()
-"""
-
-def fit_cone(pts,odr2,zscale=1.,keepnan=False,verbose=True,**kwargs):
-    """   fit pts and return residuals. Info are printed. odr2 is starting guess.
+    Returns
+    -------
+    deltaR
+        Nx3 array of residuals (x, y, z) for each point. Z is in the same units as input (i.e. multiplied by ``zscale`` if it was scaled during fitting).If ``keepnan=True``, this array has the same shape as input and NaNs are preserved in the Z column, otherwise NaNs are removed.
+        Typically the rms can be calculated as ``np.sqrt(np.nanmean(deltaR[:, 2]**2))``, or equivalently ``np.nanstd(deltaR[:,2])``, as you can assume deltaR centered on zero.
+    odr
+        Final optimized values for origin, direction, radius. In units as z (rescaled before returning if zscale was applied during fitting).
     
-    fom,deltaR,pars=fit_cone(pts,odr2,fom_func)
-    zscale is the factor to multiply data to obtain same units as x and y, 
-    e.g. 1000. for x and y in mm and z in um. Output is in same unit as input.
-    pts and deltaR enter and exit with z in microns
-    parameters for optimization can be passed as keyword arguments, e.g.:
-    
-    #evaluate fom without optimization fit_cone/fit_cylinder
-    deltaR,o = fom_function(pts,odr,zscale=1000.,options={'radius':radius})
-    
-    # fit from starting guess value odr0
-    deltaR,odr=fit_cylinder(c,odr0,zscale=1000.,options={'maxiter':500},
-        method='Nelder-Mead') 
-        
-    typically:
-    odr2=(span(xg).sum()/2.,220.,0,0.) #use nominal value for guess direction.
-    
-    See developer notes in code.
+    N.B.: interface regarding maxiter was modified on 2026/02/25 to be included in ``options`` dictionary.
     """
     
-    fom_func=cone_error3
+    fom_func=cone_error
     pts=pts/[1,1,zscale] #data are um, convert to mm before fit
 
     #filter for nans, note that this is done here rather than in fom_func so it
     #is performed only once.
     mask=~np.isnan(pts[:,2])
     
-    #find odr from optimization if maxiter is set otherwise use
-    # input parameters `odr`. Needs an absurde dictionary with key `options`
-    #  use `fit_cone(...,options={'maxiter':500})` Will run optimization
-    #  only if this is set to a number, otherwise will just evaluate
-    #  the fom. It's an ugly workaround mishandling **kwargs.
-    # done for not knowing it better.
+    # consistently with scipy.optimize.minimize, accepts a dictionary with key `options`, e.g. `fit_cone(...,options={'maxiter':500})`.
+    # `maxiter` parameter is common to all solvers, if set to 0, will just evaluate the fom.
     
-    mi=None  #mi=maxiter if called with fit_cone(..,maxiter=int)
-    if 'options' in kwargs:
-        mi=kwargs['options'].pop('maxiter',None) 
-    if mi:  
-        result=minimize(fom_func,x0=(odr2),
+    result=minimize(fom_func,x0=(odr,),
                 args=(pts[mask,:],),
                 **kwargs)   #options={'maxiter':500},
                             #method='Nelder-Mead')#,callback=p)
-        odr=result.x
-    else:
-        print('Dictionary `options` ')
-        #if set to 0 r unset do not perform optimization
-        odr=odr2
+    odr=result.x
+
         
     s=span(pts,axis=0)    
     fom,deltaR,coeff=fom_func(odr,pts[mask,:],retall=True)
-    deltaR[:,2]=deltaR[:,2]*zscale
+    
+    deltaR[:,2] *= float(zscale)
     if keepnan:
         pts[mask,2]=deltaR[:,2]
         deltaR=pts
