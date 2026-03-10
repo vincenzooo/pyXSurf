@@ -97,8 +97,7 @@ def cone_error(odr=(0,220.,0,0),points=None,coeff=None,retall=False,extra=False)
 #2015/01/13 changed sign of deltaR to set bump-positive (it was opposite)
 #from v1
 #origin=(0,0,0),direction=(0,1.,0),radius is calculated from best fit
-    """Given a set of N points in format Nx3, returns the rms surface error on the cone defined by 
-    its axis (radius and apex are determined by best fit).
+    """Given a set of N points in format Nx3, returns the rms surface error on the cone defined by its axis (radius and apex are determined by best fit).
     Axis is defined as a 4 elements vector odr=(x,z,cx,cz), not in xz plane.
     origin (intercept of the axis with y=0) and director cosines.
     If coeff is passed as input, the fit for cone surface is not performed and the coeff values are used.
