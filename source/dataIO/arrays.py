@@ -70,6 +70,91 @@ def is_monotonic(seq: Iterable[T], *, strict: bool = False) -> bool:
     return True
 
 
+import numpy as np
+
+def table_of_test_points(
+    x,
+    ys,
+    x_target,
+    *,
+    labels=None,
+    title="",
+    x_prec="actual",      # "target", "actual", "both"
+    x_name="x",
+    x_fmt="{:.2f}",
+    y_fmt="{:.3f}",
+    pad=2,                # spaces between columns
+):
+    """Create a table of extracted values from a series of vectors `ys` (with same x) at positions closest to `x_target` and format them as a table string."""
+    
+    x = np.asarray(x)
+    xt = np.asarray(x_target)
+
+    if x.size == 0:
+        raise ValueError("`x` is empty.")
+    if x_prec not in {"target", "actual", "both"}:
+        raise ValueError('`x_prec` must be one of {"target","actual","both"}.')
+
+    ys_arr = [np.asarray(y) for y in ys]
+    n = x.size
+    bad = [i for i, y in enumerate(ys_arr) if y.size != n]
+    if bad:
+        raise ValueError(f"All `ys` must have the same length as `x` ({n}). Bad indices: {bad}")
+
+    if labels is None:
+        labels = [f"y{i}" for i in range(len(ys_arr))]
+    if len(labels) != len(ys_arr):
+        raise ValueError(f"`labels` length ({len(labels)}) must match `ys` length ({len(ys_arr)}).")
+
+    # Closest indices
+    idx = np.array([int(np.argmin(np.abs(x - t))) for t in xt], dtype=int)
+
+    # Build rows as strings first
+    if x_prec == "both":
+        header = [f"{x_name}_target", f"{x_name}_actual", *labels]
+    else:
+        header = [x_name, *labels]
+
+    rows = [header]
+
+    for i, t in enumerate(xt):
+        j = idx[i]
+        if x_prec == "target":
+            x_cells = [x_fmt.format(float(t))]
+        elif x_prec == "actual":
+            x_cells = [x_fmt.format(float(x[j]))]
+        else:  # both
+            x_cells = [x_fmt.format(float(t)), x_fmt.format(float(x[j]))]
+
+        y_cells = [y_fmt.format(float(y[j])) for y in ys_arr]
+        rows.append([*x_cells, *y_cells])
+
+    # Compute column widths (header + all rows)
+    ncol = len(rows[0])
+    widths = [max(len(r[c]) for r in rows) for c in range(ncol)]
+
+    # Format: first col left, numeric cols right (looks like a table)
+    def fmt_row(r):
+        out = []
+        for c, cell in enumerate(r):
+            if c == 0:
+                out.append(cell.ljust(widths[c]))
+            else:
+                out.append(cell.rjust(widths[c]))
+        return (" " * pad).join(out)
+
+    lines = []
+    if title:
+        lines.append(title)
+        lines.append("-" * len(title))
+
+    lines.append(fmt_row(rows[0]))
+    for r in rows[1:]:
+        lines.append(fmt_row(r))
+
+    return "\n".join(lines)
+
+
 def stats (data=None,units=None,string=False,fmt=None,vars=None):
     """ Return selected statistics on data as numerical array or list of strings (one for each stats).  
     
