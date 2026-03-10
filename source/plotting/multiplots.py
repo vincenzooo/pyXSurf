@@ -32,13 +32,14 @@ def align_axis_x(ax, ax_target):
 def set_sync_shared (axes, setevent = True):
     """From a list of axis with shared x, align them independently of colorbars or other modifiers.
     
-    This function was established starting from code in `psd2d.psd2d_analysis` for cases 
-        in which matplotlib misbehaves, in place of the much simpler previous alternative
+    This function was established starting from code in `psd2d.psd2d_analysis` for cases     in which matplotlib misbehaves, in place of the much simpler previous alternative
         `plt.colorbar().remove()`.
     All axes are synchronized to the first of the list, 
     setevent binds the resize to figure event, so that any future resize will not break the sychronization.
     In case there are other conflicting events functions defined, it might be convenient not to 
          activate the event handling by setting setevent = False, but this is not tested at all.
+    
+    2026/02/26 Note that this function seems to adjust the position of the plots, not the axis. Also it works for plots placed along vertical direction, but not for horizontal ones, at least in the current implementation.
     
     usage:
     
@@ -756,6 +757,7 @@ def associate_plots(ax1,ax2,axis=None,on=0):
 def associate_plots_mw(ax1,ax2):
     """if on is None toggle, if it is 0 set off, if 1 set on. Not implemented, for now
     associate and keeps on until figure is closed.
+    Reduced functions for debugging.
     """
 
     # Declare and register callbacks
@@ -805,7 +807,7 @@ def associate_plots_mw(ax1,ax2):
     ax2.callbacks.connect('xlim_changed', on_xlims_change)
 
 def associate_plots_muc(ax1,ax2):
-    """just print the changes of axes.
+    """just print the changes of axes. Minimal use case for debugging.
     """
 
     def on_xlims_change(axes):
