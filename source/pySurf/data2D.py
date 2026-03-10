@@ -1419,7 +1419,7 @@ def data_histostats(data,x=None,y=None,bins=100,density=True,units=None,loc=0,*a
 
 ## PLOT FUNCTIONS
 
-def plot_data(data,x=None,y=None,title=None,outfile=None,units=None,stats=False,vars=None,loc=0,contour=False,colors=None,largs=None,framealpha=0.5,nsigma=None,*args,**kwargs):
+def plot_data(data,x=None,y=None,title=None,outfile=None,units=None,stats=False,vars=None,loc=0,contour=False,colors=None,largs=None,framealpha=0.5,nsigma=None,axis_check=True,*args,**kwargs):
     """Plot data using imshow and modifying some default properties.
     Units for x,y,z can be passed as 3-el array or scalar, None can be used to ignore unit.
     Broadcast all imshow arguments.
@@ -1433,6 +1433,7 @@ def plot_data(data,x=None,y=None,title=None,outfile=None,units=None,stats=False,
     In alternative can be a dictionary containing arguments for remove_outliers. 
     If None (default) range is not changed from matplotlib defaults.
     If dict, a nummber of parameters for can be passed to remove_outliers.remove_outliers to determine color range (data are left intact).
+    if axis_check is set, x and y axis must be increasing.
     
     2020/11/05 updated all stats functions.
     2020/07/14 added flag ``contour`` to overplot contours, and colors,
@@ -1480,7 +1481,8 @@ def plot_data(data,x=None,y=None,title=None,outfile=None,units=None,stats=False,
     #plotting is here to resolve conflict with clim
     if x is None: x = np.arange(data.shape[1])
     if y is None: y = np.arange(data.shape[0])
-    assert x[-1]>=x[0] and y[-1]>=y[0]
+    if axis_check:
+        assert x[-1]>=x[0] and y[-1]>=y[0]
     
     #if one of the two is a single value, plot fails. To handle this special case,
     # single values are duplicated.
