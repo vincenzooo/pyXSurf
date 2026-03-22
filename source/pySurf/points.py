@@ -36,60 +36,11 @@ directions. It is not guaranteed to work with different scanning directions."""
 CHANGES: angpos e' stata corretta funzionava con dati trasposti"""
 
 ## TRANSFORMATIONS
-def crop_points1(points,xrange=None,yrange=None,zrange=None,
-    poly=None,interactive=False):
+def crop_points(points,xrange=None,yrange=None,zrange=None,mask=False,poly=None,interactive=False):
     """crop a xyz points [Nx3], keeping only points inside xrange and yrange defined as (min,max).
         Interactive allows to set a region by zooming and/or a polygon by point and click
         (order of vertex matters)."""
-
-
-
-    if interactive:
-        """minimally tested."""
-
-        curfig=plt.gcf() if plt.get_fignums() else None
-        fig=plt.figure()
-        plot_points(points,scatter=True)
-        print ("""Zoom to the region to crop, and/or use CTRL+leftClick to add points and create
-        an polygonal selection. CTRL+rightClick remove the nearest point. Press ENTER when done.""")
-        ax=add_clickable_markers2(hold=True,propertyname='polypoints')
-        if xrange is None:
-            xrange=plt.xlim()
-        if yrange is None:
-            yrange=plt.ylim()
-        mh=ax.polypoints
-        del ax.polypoints
-        #points[~points_in_poly(points,mh),2]=np.nan
-        #points=points[~np.isnan(points[:,2]),:]
-        points=points[points_in_poly(points,mh),:]
-
-        plt.close(fig)
-        if curfig:
-            plt.figure(curfig.number);
-
-    if poly:
-        raise NotImplementedError
-
-    if xrange is not None:
-        if xrange[0] is not None:
-            points=points[(xrange[0]<=points[:,0]),:]
-        if xrange[1] is not None:
-            points=points[(points[:,0]<=xrange[1]),:]
-    if yrange is not None:
-        if yrange[0] is not None:
-            points=points[(yrange[0]<=points[:,1]),:]
-        if yrange[1] is not None:
-            points=points[(points[:,1]<=yrange[1]),:]
-    if zrange is not None:
-        if zrange[0] is not None:
-            points=points[(zrange[0]<=points[:,2]),:]
-        if zrange[1] is not None:
-            points=points[(points[:,2]<=zrange[1]),:]
-    return points
-
-def crop_points(points,xrange=None,yrange=None,zrange=None,mask=False,poly=None,interactive=False):
-    """experimental version, adds option booleam to return mask. useful e.g. to clean data based on crop on deltaR"""
-    """crop a xyz points [Nx3], keeping only points inside xrange and yrange defined as (min,max)."""
+    """experimental version, adds option boolean to return mask. useful e.g. to clean data based on crop on deltaR"""
 
     #outmask is sized as points and must remain same size all time.
     # at the end if flag mask is set, outmask is returned, else points are filtered.
@@ -160,12 +111,14 @@ def rotate_points(points,theta,center=(0,0)):
 def translate_points(points,offset=None):
     """returns translated coordinates. Useless routine, can be done with
     a simple sum points+offset"""
+    
     ndim=points.shape[-1]
-    if offset is None:
-        offset=np.zeros(ndim)
-    else:
-        assert (len(offset)==ndim)
-    return points+offset
+    
+    if offset is not None:
+        if len(offset) == ndim:
+            return points + offset
+        elif len(offset) == ndim - 1:
+            return points[:,:-1] + offset
 
 def _get_plane(points,pars=None,xrange=None,yrange=None,zrange=None,mask=None,returnPars=False):
     """
@@ -310,7 +263,6 @@ def points_in_poly2(pts,vert):
     from shapely.geometry.polygon import Polygon
     inpoly=np.zeros(pts.shape[0]).astype(bool)
 
-
     point = Point(0.5, 0.5)
     polygon = Polygon(verts)
     return polygon.contains(point)
@@ -325,7 +277,16 @@ def points_in_poly(pts,verts):
     return p.contains_points(pts)
     #return np.hstack([pts[:,:2],p.contains_points(pts)[:,np.newaxis]])
 
-
+def points_in_circle(pts, center, radius):
+    """return a boolen array (mask), True if xy of point is inside a circle 
+    (if center is given as two element vector), or sphere (if center is 3D)."""
+    
+    if np.size(center) == 2:
+        mask = ((pts[:,:2]-np.array(center))**2).sum(axis=1)<=radius**2 
+    else:
+        raise NotImplementedError("3D center, this should filter only points inside a sphere.") 
+    
+    return mask
 
 def clipStats(p,clip):
     print('clip for %s : %s'%(clip))
