@@ -462,12 +462,11 @@ def register_data(data,x,y,scale=(1,1,1.),
     """Get data,x,y and register them using usual set of parameters.
 
     registering operation are performed in the following order and are:
-        scale: scale the three axis of the ``scale`` factor, if sign is changed, reorder.
+        scale: scale the three axis of the ``scale`` factor. For example if original data are in mm, but we want to modify the data to have z in um, use scale = (1.,1,1000). 
+            x and y axis must be increasing, so they are sorted if a negative scale is set.
         strip: if True, strip all nans at the border of the data.
         crop: list of ranges (3 axis) to pass to data2D.crop_data
-        center: final position of data center (0,0) in x and y data coordinates, 
-        if 2 element, center data coordinates, if 3 elements, center also data.
-        This means e.g. that data are first cropped (or cleaned of invalid data) than centered. This means that the value puts in the provided coordinate(s) the center of points after cropping operations.
+        center: final coordinates of data central point (median point of coordinates range), can be 2D or 3D: if 2 element, center data coordinates, if 3 elements, center also data. N.B.: data are first cropped (or cleaned of invalid data), then centered. If you want the center coordinates to be set using all data, you need to manually manipulate data.
         unexpected parameters passed to register_data are ignored (*args and **kwargs are not used, just suppress error).
 
     Note that read_data already calls register (after stripping common arguments) careful not to call twice.

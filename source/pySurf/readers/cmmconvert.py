@@ -1,4 +1,4 @@
-"""read a CMM program file saved as text and convert measured points to a x,y,z file."""
+"""read a CMM program (Mistral, from Browne & Sharpe at SAO) file saved as text and convert measured points to a x,y,z file."""
 def cmmconvert(filename,startline, step, outfile=None):
     l=open(filename,'r').readlines()
     c=[(a[0].split('<')[-1],a[1],a[2][:-1]) for a in [ll.split(',')[0:3] for ll in l [startline::step]]]
