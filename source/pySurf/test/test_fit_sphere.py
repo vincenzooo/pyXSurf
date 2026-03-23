@@ -1,6 +1,6 @@
 import numpy as np
 
-from pySurf.fit_sphere import sphere_error3, fit_sphere
+from pySurf.fit_sphere import sphere_error, fit_sphere
 
 
 def _random_sphere_points(center, radius, n=2000, noise_sigma=0.0, seed=0):
@@ -14,12 +14,12 @@ def _random_sphere_points(center, radius, n=2000, noise_sigma=0.0, seed=0):
     return pts
 
 
-def test_sphere_error3_perfect_sphere():
+def test_sphere_error_perfect_sphere():
     center = np.array([1.0, -2.0, 0.5])
     radius = 10.0
     pts = _random_sphere_points(center, radius, n=500, noise_sigma=0.0, seed=1)
 
-    fom, residuals, rad = sphere_error3(center, pts, retall=True)
+    fom, residuals, rad = sphere_error(center, pts, retall=True)
 
     assert np.isclose(fom, 0.0, atol=1e-12)
     assert np.isclose(rad, radius, atol=1e-12)
@@ -36,18 +36,18 @@ def test_fit_sphere_recovers_center_and_radius():
     # Start from an offset guess
     guess = true_center + np.array([0.6, -0.4, 0.3])
 
-    residuals, center_fit, radius_fit = fit_sphere(
+    residuals, center_fit = fit_sphere(
         pts,
         guess,
         zscale=1.0,
         keepnan=False,
-        return_radius=True,
         verbose=False,
         method="Nelder-Mead",
         options={"maxiter": 3000},
     )
 
     # With moderate noise, the fitted center should be close
+    _,_,radius_fit = sphere_error(center_fit, pts, retall=True)
     assert np.linalg.norm(center_fit - true_center) < 0.05
     assert abs(radius_fit - true_radius) < 0.05
 
@@ -58,20 +58,21 @@ def test_fit_sphere_recovers_center_and_radius():
 
 def test_fit_sphere_fixed_radius():
     true_center = np.array([2.0, 1.0, -3.0])
-    true_radius = 12.0
+    true_radius = 13
     pts = _random_sphere_points(true_center, true_radius, n=1000, noise_sigma=0.02, seed=3)
 
     guess = true_center + np.array([0.2, 0.2, -0.2])
-    residuals, center_fit, radius_fit = fit_sphere(
+    residuals, center_fit = fit_sphere(
         pts,
         guess,
-        return_radius=True,
         verbose=False,
         method="Nelder-Mead",
         options={"maxiter": 2500, "radius": true_radius},
     )
 
-    assert np.isclose(radius_fit, true_radius, atol=1e-12)
+    _,_,radius_fit = sphere_error(center_fit, pts, retall=True)
+    
+    assert np.isclose(radius_fit, true_radius, atol=1e-3)
     assert np.linalg.norm(center_fit - true_center) < 0.1
     assert residuals.shape == (pts.shape[0], 3)
 

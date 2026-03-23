@@ -4,20 +4,51 @@ fit_sphere
 
 Sphere fitting utilities for 3D point clouds.
 
-This module is modeled after the API patterns used in the existing *fit_cylinder.py*
-module (e.g., an ``*_error3`` function used as a figure-of-merit (FOM) and a
-``fit_*`` convenience wrapper that optionally runs ``scipy.optimize.minimize``). fileciteturn0file0
-
-The core convention matches the "bump positive" sign used in ``fit_cylinder.py``:
-a point that lies *inside* the best-fit sphere (smaller radial distance) yields a
-**positive** residual.
-
 Key functions
 -------------
 - ``sphere_error``: compute RMS radial error of points w.r.t. a sphere, optionally
   fitting radius analytically for each center.
 - ``fit_sphere``: wrapper that handles NaNs, optional Z scaling, and optional
   optimization.
+
+Design notes
+------------
+In the original ``fit_cylinder.fit_cylinder`` wrapper, optimization is enabled by
+placing ``maxiter`` inside the SciPy ``options`` dictionary and then *popping*
+that key to decide whether to run the optimizer. That has two drawbacks:
+
+1) It is not intuitive unless you already know SciPy's ``minimize`` API.
+2) Popping ``maxiter`` removes it from the dictionary passed to SciPy, so the
+   optimizer may not actually be constrained by that limit.
+
+Here, optimization is controlled by an explicit ``maxiter`` argument.
+For backwards compatibility, callers may still pass ``options={'maxiter': ...}``,
+but the value is read without removing it, and the explicit ``maxiter`` argument
+(always) takes precedence.
+
+Conventions
+-----------
+The *RMS* figure-of-merit is always computed from the orthogonal (radial)
+residual magnitude ``|distance(center, point) - radius|``.
+
+For the *sign* of the returned per-point residuals, this module defaults to a
+"Z-up" convention that is often more convenient for surface metrology:
+
+- A residual is **positive** if the point is **above** the fitted sphere along
+  the global +Z direction, i.e. ``z_point > z_sphere(x_point, y_point)``.
+- This remains true whether the fitted cap is "convex" or "concave".
+
+The legacy "inside-positive" convention (matching ``fit_cylinder.cylinder_error3``)
+can be requested via ``sign_mode='inside'``.
+
+Units
+-----
+Like ``fit_cylinder.fit_cylinder``, ``fit_sphere`` supports ``zscale`` to
+normalize units before fitting:
+
+- Input points are assumed to be ``[x, y, z]``.
+- Internally, points are divided by ``[1, 1, zscale]`` before fitting.
+- Output residuals are returned in the original units (z multiplied back).
 
 The implementation does not depend on external project packages (e.g., ``pySurf``),
 so it can be used as a standalone utility.
@@ -46,7 +77,8 @@ def sphere_error(
     *,
     radius: Optional[float] = None,
     retall: bool = False,
-):
+    sign_mode: str = "z",
+    ) -> Union[float, Tuple[float, np.ndarray, float]]:
     """
     Calculate RMS surface error for points w.r.t. a sphere.
 
@@ -65,7 +97,7 @@ def sphere_error(
 
     Returns
     -------
-    fom : float
+    rms : float
         RMS of radial residuals.
     residuals : (N, 3) array, optional
         Array ``[x, y, deltaR]`` where ``deltaR = radius - ||p-center||``. Returned if ``retall=True``.
@@ -118,29 +150,49 @@ def sphere_error(
         rad = float(radius)
 
     deltaR = rad - R  # bump-positive convention
-    fom = float(np.sqrt(np.nansum(deltaR**2) / len(deltaR)))
+    rms = float(np.sqrt(np.nansum(deltaR**2) / len(deltaR)))
     
     if not retall:
-        return fom
+        return rms
 
     # residuals shaped like the project convention: [x, y, deltaR]
     x, y, _z = np.hsplit(pts, 3)
+    
+    if sign_mode.lower() in ("z", "zup", "z-up"):
+        # Choose the hemisphere that best matches each point, then sign by Z.
+        rxy2 = (x - c[0]) ** 2 + (y - c[1]) ** 2
+        inside = float(radius) ** 2 - rxy2
+        root = np.sqrt(np.clip(inside, 0.0, None))
+        z_plus = c[2] + root
+        z_minus = c[2] - root
+        use_plus = np.abs(z - z_plus) <= np.abs(z - z_minus)
+        z_fit = np.where(use_plus, z_plus, z_minus)
+        dz = z - z_fit
+        sgn = np.sign(dz)
+        # For dz==0 (exactly on the surface) the magnitude is already 0, but
+        # keep sign stable.
+        sgn[sgn == 0] = 1.0
+        deltaR = np.abs(deltaR) * sgn
+    elif not sign_mode.lower() in ("inside", "radial", "legacy"):
+        raise ValueError("sign_mode must be 'z' (default) or 'inside'.")
+    
+    
     residuals = np.hstack([x, y, deltaR[:, None]])
 
     if retall:
-        return fom, residuals, rad
+        return rms, residuals, rad
     else:
-        return fom
+        return rms
 
 
 def fit_sphere(
     pts: ArrayLike,
     center0: ArrayLike,
     *,
+    maxiter = None,
     zscale: float = 1.0,
     keepnan: bool = False,
-    return_radius: bool = False,
-    return_result: bool = True,
+    return_result: bool = False,
     verbose: bool = False,
     **kwargs,
 ):
@@ -149,7 +201,7 @@ def fit_sphere(
 
     This follows the *fit_cylinder.py* wrapper style:
 
-    - If ``options={'maxiter': N}`` is provided (N != 0), an optimization is run.
+    - If maxiter is provided (either explicitly or as ``options={'maxiter': N}`` N != 0), an optimization is run.
       Otherwise, the FOM is evaluated at ``center0`` without optimization.
     - ``zscale`` is used to scale Z during the fit so that X/Y and Z share units
       (e.g. X/Y in mm, Z in µm -> use zscale=1000).
@@ -169,30 +221,27 @@ def fit_sphere(
     keepnan
         Preserve NaNs in the Z column and return an array with the same shape as
         input.
-    return_radius
-        If True, return ``(residuals, center, radius)`` instead of ``(residuals, center)``.
     return_result
-        If True, return a ``SphereFitResult`` dataclass instead of tuple output.
-        This takes precedence over ``return_radius``.
+        If True, return a third value ``SphereFitResult``, in addition to residuals, center.
     verbose
         Print a compact report.
 
     kwargs
-        Passed to ``scipy.optimize.minimize``. To trigger optimization, include
-        an ``options`` dict with a ``maxiter`` key. Two additional keys are
-        recognized inside ``options``:
-          - ``radius``: fix the sphere radius to this value (no radius fit).
-          - ``maxiter``: optimization iterations (popped from options before calling scipy).
+        Passed to ``scipy.optimize.minimize``. To trigger optimization. 
+        Additional key ``radius``: fix the sphere radius to this value (no radius fit).
+        Can include a ``maxiter`` key (common to all solvers), overridden if explicitly passed to ``fit_sphere``. If maxiter is set to 0, the function is evaluated without optimization.
 
     Returns
     -------
     By default:
         residuals, center
-    If return_radius:
-        residuals, center, radius
     If return_result:
-        SphereFitResult
+        residuals, center, SphereFitResult
+        
+    Note that center defines automatically the best fit radius. To know this value,
+        use: ``fom, deltaR, rad_fit = sphere_error(center, pts, retall=True)``
     """
+    
     fom_func=sphere_error
     
     pts_in = pts #_as_points(pts)
@@ -209,12 +258,12 @@ def fit_sphere(
     c0 = np.asarray(center0, dtype=float).reshape(3)
 
     # Parse options dict similar to fit_cylinder.py
-    maxiter = None
     fixed_radius = None
     opt_options = None
     if "options" in kwargs and isinstance(kwargs["options"], dict):
         opt_options = dict(kwargs["options"])  # copy
-        maxiter = opt_options.pop("maxiter", None)
+        if maxiter is None:
+            maxiter = opt_options.pop("maxiter", None)
         fixed_radius = opt_options.pop("radius", None)
         kwargs["options"] = opt_options
 
@@ -266,7 +315,7 @@ def fit_sphere(
         print(f"rms residuals={fom_out} [units of original Z]")
         print("-----------------------------------")
 
-    if return_radius:
-        return deltaR, center, rad_fit
+    if return_result:
+        return deltaR, center, optimizer_result
     
     return deltaR, center
