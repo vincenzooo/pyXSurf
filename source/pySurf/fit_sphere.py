@@ -77,8 +77,7 @@ def sphere_error(
     *,
     radius: Optional[float] = None,
     retall: bool = False,
-    sign_mode: str = "z",
-    ) -> Union[float, Tuple[float, np.ndarray, float]]:
+):
     """
     Calculate RMS surface error for points w.r.t. a sphere.
 
@@ -97,7 +96,7 @@ def sphere_error(
 
     Returns
     -------
-    rms : float
+    fom : float
         RMS of radial residuals.
     residuals : (N, 3) array, optional
         Array ``[x, y, deltaR]`` where ``deltaR = radius - ||p-center||``. Returned if ``retall=True``.
@@ -150,39 +149,19 @@ def sphere_error(
         rad = float(radius)
 
     deltaR = rad - R  # bump-positive convention
-    rms = float(np.sqrt(np.nansum(deltaR**2) / len(deltaR)))
+    fom = float(np.sqrt(np.nansum(deltaR**2) / len(deltaR)))
     
     if not retall:
-        return rms
+        return fom
 
     # residuals shaped like the project convention: [x, y, deltaR]
     x, y, _z = np.hsplit(pts, 3)
-    
-    if sign_mode.lower() in ("z", "zup", "z-up"):
-        # Choose the hemisphere that best matches each point, then sign by Z.
-        rxy2 = (x - c[0]) ** 2 + (y - c[1]) ** 2
-        inside = float(radius) ** 2 - rxy2
-        root = np.sqrt(np.clip(inside, 0.0, None))
-        z_plus = c[2] + root
-        z_minus = c[2] - root
-        use_plus = np.abs(z - z_plus) <= np.abs(z - z_minus)
-        z_fit = np.where(use_plus, z_plus, z_minus)
-        dz = z - z_fit
-        sgn = np.sign(dz)
-        # For dz==0 (exactly on the surface) the magnitude is already 0, but
-        # keep sign stable.
-        sgn[sgn == 0] = 1.0
-        deltaR = np.abs(deltaR) * sgn
-    elif not sign_mode.lower() in ("inside", "radial", "legacy"):
-        raise ValueError("sign_mode must be 'z' (default) or 'inside'.")
-    
-    
     residuals = np.hstack([x, y, deltaR[:, None]])
 
     if retall:
-        return rms, residuals, rad
+        return fom, residuals, rad
     else:
-        return rms
+        return fom
 
 
 def fit_sphere(
