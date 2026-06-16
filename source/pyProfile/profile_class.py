@@ -92,8 +92,10 @@ def __array_finalize__(self, obj):
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+import warnings
 from copy import deepcopy
 import inspect  # to use with importing docstring
+import time
 
 import dataIO
 from dataIO.span import span
@@ -335,7 +337,7 @@ class Profile(object):  #np.ndarrays
     #if data is not None:
         # self.x, self.y = np.array(x), np.array(y)
         
-        breakpoint()
+        # breakpoint()
         self.x,self.y=register_profile(np.array(x), np.array(y),scale=scale,*args,**kwargs) # se load_profile calls register, this
         #goes indented.
 
@@ -1091,10 +1093,18 @@ class Plist(Superlist):
         """save stacked or on separate files"""
         
         if 'type' in kwargs:
-            mode = kwargs.pop('type')
-            print("`type` keyword is deprecated, use `mode` instead.")
-            sleep(5)
-        
+            warnings.warn(
+                "`type` keyword is deprecated, use `mode` instead. I have applied a delay to force you to update the code.",
+                category=DeprecationWarning,
+                stacklevel=2,
+            )
+            time.sleep(5)
+            
+            if 'mode' in kwargs:
+                raise ValueError("Both 'type' and 'mode' keywords are provided. Please use only 'mode'.")
+            else:
+                mode = kwargs.pop('type')
+
         if mode == 'separate':
             outfiles=[]
             for p in self:

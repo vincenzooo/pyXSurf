@@ -11,6 +11,8 @@ import itertools
 import os
 import time
 from copy import deepcopy
+import warnings
+
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -636,9 +638,17 @@ class Dlist(Superlist):
         """
         
         if 'type' in kwargs:
-            mode = kwargs.pop('type')
-            print("`type` keyword is deprecated, use `mode` instead.")
+            warnings.warn(
+                "`type` keyword is deprecated, use `mode` instead. I have applied a delay to force you to update the code.",
+                category=DeprecationWarning,
+                stacklevel=2,
+            )
             time.sleep(5)
+            
+            if 'mode' in kwargs:
+                raise ValueError("Both 'type' and 'mode' keywords are provided. Please use only 'mode'.")
+            else:
+                mode = kwargs.pop('type')
             
         
         if mode == 'figures': 
