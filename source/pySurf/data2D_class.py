@@ -276,8 +276,14 @@ class Data2D(object):  # np.ndarrays
                     )
                 if x is None:
                     x = np.arange(data.shape[1])
+                else:   # x as range
+                    if np.size(x) == 2:
+                        x = np.linspace(*x, data.shape[1])
                 if y is None:
                     y = np.arange(data.shape[0])
+                else:   # y as range
+                    if np.size(y) == 2:
+                        y = np.linspace(*y, data.shape[0])
 
                 # if data is not None:
                 # se read_data calls register, this
