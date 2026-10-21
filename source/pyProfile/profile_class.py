@@ -670,7 +670,7 @@ class Profile(object):  #np.ndarrays
             res = merge_profile(self.x,self.y,other.x,other.y,*args,**kwargs)
             res = self.__class__(*res,units=self.units,name=self.name + " // " + other.name)
         else:
-            raise ValueError("Unrecognized type in merge")
+            raise ValueError("Unrecognized mode in merge")
         return res
         
     def min (self):
@@ -1100,11 +1100,6 @@ class Plist(Superlist):
             )
             time.sleep(5)
             
-            if 'mode' in kwargs:
-                raise ValueError("Both 'type' and 'mode' keywords are provided. Please use only 'mode'.")
-            else:
-                mode = kwargs.pop('type')
-
         if mode == 'separate':
             outfiles=[]
             for p in self:
