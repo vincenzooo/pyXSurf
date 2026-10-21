@@ -314,6 +314,7 @@ class Superlist(list):
         attr = object.__getattribute__(self, name)
         if hasattr(attr, '__call__'):
             def newfunc(*args, **kwargs):
+                #breakpoint()
                 result = attr(*args, **kwargs)
                 return result
                 #return self.__class__(result)  #doesn't work, big crash
