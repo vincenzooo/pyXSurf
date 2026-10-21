@@ -118,7 +118,8 @@ def count_header_lines(filename, comment_char="#", method = 'all',*args,**kwargs
     if method == 'last':
         header_lines = np.where(comment_lines)[0][-1]
     elif method == 'all':
-        header_lines = np.where(comment_lines == np.arange(len(comment_lines)))[0][-1]
+        comment_indices = np.where(comment_lines)[0]
+        header_lines = len(np.where(comment_indices == np.arange(len(comment_indices)))[0])
     else:
         raise ValueError("non valid method.")
     
