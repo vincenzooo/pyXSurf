@@ -233,7 +233,7 @@ def plot_data_repeat(dlist,name="",num=None,*args,**kwargs):
         
     return res       
 
-def dcouples_plot(dlist):  # level=True, dfunk = None,
+def dcouples_plot(dlist,layout='linear',commonscale=False):  # level=True, dfunk = None,
     """calculate and plots rotating differences, data are supposed to be already aligned. 
     plots are generated on a grid, x and y axes are shared, color scale is automatic for each subplot.
     
@@ -261,7 +261,13 @@ def dcouples_plot(dlist):  # level=True, dfunk = None,
     plt.clf()
     maximize()
     
-    xs,ys=find_grid_size(len(dcouples),square=True)[::-1]
+    if layout == 'linear':
+        xs,ys=find_grid_size(len(dcouples),square=True)[::-1]
+    elif layout == 'triangle':
+        xs = ys =len(dlist)-1
+    else:
+        raise ValueError('layout must be linear or triangle')
+    
     fig,axes=plt.subplots(xs,ys)
     plt.close() #prevent from showing inline in notebook with %matplotlib inline
     if len(np.shape(axes))>1:
@@ -269,8 +275,14 @@ def dcouples_plot(dlist):  # level=True, dfunk = None,
     elif len(np.shape(axes))==0:
         axes=[axes]
     maximize()
+    if layout == 'triangle':  #sort list of axis so that the upper ones are used first. This should automatically adjust the plotting order.
+        upper_mask = np.triu(np.ones((xs, ys), dtype=bool)).flatten()
+        axes = np.concatenate([
+            axes[upper_mask],     # triangolo superiore, diagonale inclusa
+            axes[~upper_mask]     # tutti gli altri assi
+        ])
     for i,(ll,ax) in enumerate(zip(dcouples,axes)):
-        plt.subplot(xs,ys,i+1,sharex=axes[0],sharey=axes[0])
+        #plt.subplot(xs,ys,i+1,sharex=axes[0],sharey=axes[0])
         ll.plot()
     for ax in axes[:len(dcouples)-1:-1]:
         fig.delaxes(ax)
